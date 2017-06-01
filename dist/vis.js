@@ -5,7 +5,7 @@
  * A dynamic, browser-based visualization library.
  *
  * @version 4.16.1
- * @date    2016-09-19
+ * @date    2017-06-01
  *
  * @license
  * Copyright (C) 2011-2016 Almende B.V, http://almende.com
@@ -28889,7 +28889,7 @@ return /******/ (function(modules) { // webpackBootstrap
     this.physics = new _PhysicsEngine2.default(this.body); // physics engine, does all the simulations
     this.layoutEngine = new _LayoutEngine2.default(this.body); // layout engine for inital layout and hierarchical layout
     this.clustering = new _Clustering2.default(this.body); // clustering api
-    this.manipulation = new _ManipulationSystem2.default(this.body, this.canvas, this.selectionHandler); // data manipulation system
+    this.manipulation = new _ManipulationSystem2.default(this.body, this.canvas, this.selectionHandler, this.interactionHandler); // data manipulation system
 
     this.nodesHandler = new _NodesHandler2.default(this.body, this.images, this.groups, this.layoutEngine); // Handle adding, deleting and updating of nodes as well as global options
     this.edgesHandler = new _EdgesHandler2.default(this.body, this.images, this.groups); // Handle adding, deleting and updating of edges as well as global options
@@ -29335,6 +29335,9 @@ return /******/ (function(modules) { // webpackBootstrap
   };
   Network.prototype.fit = function () {
     return this.view.fit.apply(this.view, arguments);
+  };
+  Network.prototype.customFit = function () {
+    return this.view.customFit.apply(this.view, arguments);
   };
   Network.prototype.moveTo = function () {
     return this.view.moveTo.apply(this.view, arguments);
@@ -39129,6 +39132,7 @@ return /******/ (function(modules) { // webpackBootstrap
       this.viewFunction = undefined;
 
       this.body.emitter.on("fit", this.fit.bind(this));
+      this.body.emitter.on("customFit", this.customFit.bind(this));
       this.body.emitter.on("animationFinished", function () {
         _this.body.emitter.emit("_stopRendering");
       });
@@ -39205,6 +39209,90 @@ return /******/ (function(modules) { // webpackBootstrap
         }
 
         var center = _NetworkUtil2.default.findCenter(range);
+        var animationOptions = { position: center, scale: zoomLevel, animation: options.animation };
+        this.moveTo(animationOptions);
+      }
+
+      //Custom fit for OpManager BG Image included
+
+    }, {
+      key: 'customFit',
+      value: function customFit() {
+        var options = arguments.length <= 0 || arguments[0] === undefined ? { nodes: [] } : arguments[0];
+        var initialZoom = arguments.length <= 1 || arguments[1] === undefined ? false : arguments[1];
+
+        var range = void 0;
+        var zoomLevel = void 0;
+        if (options.nodes === undefined || options.nodes.length === 0) {
+          options.nodes = this.body.nodeIndices;
+        }
+        if (initialZoom === true) {
+          // check if more than half of the nodes have a predefined position. If so, we use the range, not the approximation.
+          var positionDefined = 0;
+          for (var nodeId in this.body.nodes) {
+            if (this.body.nodes.hasOwnProperty(nodeId)) {
+              var node = this.body.nodes[nodeId];
+              if (node.predefinedPosition === true) {
+                positionDefined += 1;
+              }
+            }
+          }
+          if (positionDefined > 0.5 * this.body.nodeIndices.length) {
+            this.fit(options, false);
+            return;
+          }
+
+          range = _NetworkUtil2.default.getRange(this.body.nodes, options.nodes);
+
+          var numberOfNodes = this.body.nodeIndices.length;
+          zoomLevel = 12.662 / (numberOfNodes + 7.4147) + 0.0964822; // this is obtained from fitting a dataset from 5 points with scale levels that looked good.
+
+          // correct for larger canvasses.
+          var factor = Math.min(this.canvas.frame.canvas.clientWidth / 600, this.canvas.frame.canvas.clientHeight / 600);
+          zoomLevel *= factor;
+        } else {
+          this.body.emitter.emit("_resizeNodes");
+          range = _NetworkUtil2.default.getRange(this.body.nodes, options.nodes);
+          if (options.bvImageSet) {
+            if (range.maxX < options.imWidth / 2) {
+              range.maxX = options.imWidth / 2;
+            }
+            if (range.minX > 0 - options.imWidth / 2) {
+              range.minX = 0 - options.imWidth / 2;
+            }
+            if (range.maxY < options.imHeight / 2) {
+              range.maxY = options.imHeight / 2;
+            }
+            if (range.minY > 0 - options.imHeight / 2) {
+              range.minY = 0 - options.imHeight / 2;
+            }
+          }
+          console.log(range);
+          console.log("this.canvas.frame.canvas.clientWidth:" + this.canvas.frame.canvas.clientWidth);
+          console.log("this.canvas.frame.canvas.clientHeight:" + this.canvas.frame.canvas.clientHeight);
+          var xDistance = Math.abs(range.maxX - range.minX) * 1.1;
+          var yDistance = Math.abs(range.maxY - range.minY) * 1.1;
+
+          var xZoomLevel = this.canvas.frame.canvas.clientWidth / xDistance;
+          var yZoomLevel = this.canvas.frame.canvas.clientHeight / yDistance;
+
+          zoomLevel = xZoomLevel <= yZoomLevel ? xZoomLevel : yZoomLevel;
+          console.log("xDistance:" + xDistance);
+          console.log("yDistance:" + yDistance);
+          console.log(range);
+          console.log("zoomLevel:" + zoomLevel);
+        }
+
+        if (zoomLevel > 1.0) {
+          zoomLevel = 1.0;
+        } else if (zoomLevel === 0) {
+          zoomLevel = 1.0;
+        }
+
+        var center = _NetworkUtil2.default.findCenter(range);
+        if (options.bvImageSet) {
+          center = { x: 0, y: 0 };
+        }
         var animationOptions = { position: center, scale: zoomLevel, animation: options.animation };
         this.moveTo(animationOptions);
       }
@@ -42993,7 +43081,7 @@ return /******/ (function(modules) { // webpackBootstrap
    */
 
   var ManipulationSystem = function () {
-    function ManipulationSystem(body, canvas, selectionHandler) {
+    function ManipulationSystem(body, canvas, selectionHandler, interactionHandler) {
       var _this = this;
 
       _classCallCheck(this, ManipulationSystem);
@@ -43001,6 +43089,7 @@ return /******/ (function(modules) { // webpackBootstrap
       this.body = body;
       this.canvas = canvas;
       this.selectionHandler = selectionHandler;
+      this.interactionHandler = interactionHandler;
 
       this.editMode = false;
       this.manipulationDiv = undefined;
@@ -43365,7 +43454,7 @@ return /******/ (function(modules) { // webpackBootstrap
 
         // temporarily overload functions
         //Connect the edges to the selected node by default
-        this._handleConnect(event);
+        this._handleConnectNew(event);
         this._temporaryBindUI('onTouch', this._handleConnect.bind(this));
         this._temporaryBindUI('onDragEnd', this._finishConnectCustom.bind(this));
         this._temporaryBindUI('onDrag', this._dragControlNode.bind(this));
@@ -44094,6 +44183,79 @@ return /******/ (function(modules) { // webpackBootstrap
         }
       }
     }, {
+      key: '_handleConnectNew',
+      value: function _handleConnectNew(event) {
+        // check to avoid double fireing of this function.
+        if (new Date().valueOf() - this.touchTime > 100) {
+          this.lastTouch = this.body.functions.getPointer(event.center);
+          this.lastTouch.translation = util.extend({}, this.body.view.translation); // copy the object
+
+          var pointer = this.lastTouch;
+          var node = this.selectionHandler.getNodeAt(pointer);
+          if (node === undefined) {
+            var i = 1;
+            for (i = 1; i < 9; i++) {
+              var tempNode = undefined;
+              switch (i) {
+                case 1:
+                  tempNode = this.selectionHandler.getNodeAt({ x: pointer.x, y: pointer.y + 10, translation: pointer.translation });
+                case 2:
+                  tempNode = this.selectionHandler.getNodeAt({ x: pointer.x + 10, y: pointer.y + 10, translation: pointer.translation });
+                case 3:
+                  tempNode = this.selectionHandler.getNodeAt({ x: pointer.x + 10, y: pointer.y, translation: pointer.translation });
+                case 4:
+                  tempNode = this.selectionHandler.getNodeAt({ x: pointer.x + 10, y: pointer.y - 10, translation: pointer.translation });
+                case 5:
+                  tempNode = this.selectionHandler.getNodeAt({ x: pointer.x, y: pointer.y - 10, translation: pointer.translation });
+                case 6:
+                  tempNode = this.selectionHandler.getNodeAt({ x: pointer.x - 10, y: pointer.y - 10, translation: pointer.translation });
+                case 7:
+                  tempNode = this.selectionHandler.getNodeAt({ x: pointer.x - 10, y: pointer.y, translation: pointer.translation });
+                case 8:
+                  tempNode = this.selectionHandler.getNodeAt({ x: pointer.x - 10, y: pointer.y + 10, translation: pointer.translation });
+              }
+              if (tempNode !== undefined) {
+                node = tempNode;
+                break;
+              }
+            }
+          }
+          if (node !== undefined) {
+            if (node.isCluster === true) {
+              alert(this.options.locales[this.options.locale]['createEdgeError'] || this.options.locales['en']['createEdgeError']);
+            } else {
+              // create a node the temporary line can look at
+              var targetNode = this._getNewTargetNode(node.x, node.y);
+              this.body.nodes[targetNode.id] = targetNode;
+              this.body.nodeIndices.push(targetNode.id);
+
+              // create a temporary edge
+              var connectionEdge = this.body.functions.createEdge({
+                id: 'connectionEdge' + util.randomUUID(),
+                from: node.id,
+                to: targetNode.id,
+                physics: false,
+                color: {
+                  color: '#000000',
+                  inherit: false
+                },
+                smooth: {
+                  enabled: true,
+                  type: 'continuous',
+                  roundness: 0.5
+                }
+              });
+              this.body.edges[connectionEdge.id] = connectionEdge;
+              this.body.edgeIndices.push(connectionEdge.id);
+
+              this.temporaryIds.nodes.push(targetNode.id);
+              this.temporaryIds.edges.push(connectionEdge.id);
+            }
+          }
+          this.touchTime = new Date().valueOf();
+        }
+      }
+    }, {
       key: '_dragControlNode',
       value: function _dragControlNode(event) {
         var pointer = this.body.functions.getPointer(event.center);
@@ -44103,9 +44265,11 @@ return /******/ (function(modules) { // webpackBootstrap
           targetNode.y = this.canvas._YconvertDOMtoCanvas(pointer.y);
           this.body.emitter.emit('_redraw');
         } else {
-          var diffX = pointer.x - this.lastTouch.x;
-          var diffY = pointer.y - this.lastTouch.y;
-          this.body.view.translation = { x: this.lastTouch.translation.x + diffX, y: this.lastTouch.translation.y + diffY };
+          if (this.interactionHandler.options.dragView) {
+            var diffX = pointer.x - this.lastTouch.x;
+            var diffY = pointer.y - this.lastTouch.y;
+            this.body.view.translation = { x: this.lastTouch.translation.x + diffX, y: this.lastTouch.translation.y + diffY };
+          }
         }
       }
 
