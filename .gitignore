@@ -5,7 +5,6 @@ node_modules
 .project
 .settings/
 npm-debug.log
-dist
 
 # vim temporary files
 .*.sw[op]
