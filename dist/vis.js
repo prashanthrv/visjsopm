@@ -5,7 +5,7 @@
  * A dynamic, browser-based visualization library.
  *
  * @version 4.16.1
- * @date    2017-06-01
+ * @date    2017-07-10
  *
  * @license
  * Copyright (C) 2011-2016 Almende B.V, http://almende.com
@@ -39254,43 +39254,43 @@ return /******/ (function(modules) { // webpackBootstrap
           this.body.emitter.emit("_resizeNodes");
           range = _NetworkUtil2.default.getRange(this.body.nodes, options.nodes);
           if (options.bvImageSet) {
-            if (range.maxX < options.imWidth / 2) {
-              range.maxX = options.imWidth / 2;
+            if (range.maxX < options.imWidth - 670) {
+              range.maxX = options.imWidth - 670;
             }
-            if (range.minX > 0 - options.imWidth / 2) {
-              range.minX = 0 - options.imWidth / 2;
+            // if(range.minX>(0-(options.imWidth/2))){
+            //   range.minX=0-(options.imWidth/2);
+            // }
+            if (range.minX > -670) {
+              range.minX = -670;
             }
-            if (range.maxY < options.imHeight / 2) {
-              range.maxY = options.imHeight / 2;
+            if (range.maxY < options.imHeight - 375) {
+              range.maxY = options.imHeight - 375;
             }
-            if (range.minY > 0 - options.imHeight / 2) {
-              range.minY = 0 - options.imHeight / 2;
+            if (range.minY > -375) {
+              range.minY = -375;
             }
+            // if(range.minY>(0-(options.imHeight/2))){
+            //   range.minY=0-(options.imHeight/2);
+            // }
           }
-          console.log(range);
-          console.log("this.canvas.frame.canvas.clientWidth:" + this.canvas.frame.canvas.clientWidth);
-          console.log("this.canvas.frame.canvas.clientHeight:" + this.canvas.frame.canvas.clientHeight);
-          var xDistance = Math.abs(range.maxX - range.minX) * 1.1;
-          var yDistance = Math.abs(range.maxY - range.minY) * 1.1;
+          var xDistance = Math.abs(range.maxX - range.minX) * 1.02;
+          var yDistance = Math.abs(range.maxY - range.minY) * 1.02;
 
           var xZoomLevel = this.canvas.frame.canvas.clientWidth / xDistance;
           var yZoomLevel = this.canvas.frame.canvas.clientHeight / yDistance;
 
           zoomLevel = xZoomLevel <= yZoomLevel ? xZoomLevel : yZoomLevel;
-          console.log("xDistance:" + xDistance);
-          console.log("yDistance:" + yDistance);
-          console.log(range);
-          console.log("zoomLevel:" + zoomLevel);
         }
 
-        if (zoomLevel > 1.0) {
-          zoomLevel = 1.0;
-        } else if (zoomLevel === 0) {
+        // if (zoomLevel > 1.0) {
+        //   zoomLevel = 1.0;
+        // }
+        if (zoomLevel === 0) {
           zoomLevel = 1.0;
         }
 
         var center = _NetworkUtil2.default.findCenter(range);
-        if (options.bvImageSet) {
+        if (options.centerFocus) {
           center = { x: 0, y: 0 };
         }
         var animationOptions = { position: center, scale: zoomLevel, animation: options.animation };
